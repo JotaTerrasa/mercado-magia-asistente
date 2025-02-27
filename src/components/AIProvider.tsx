@@ -7,6 +7,8 @@ interface AIContextType {
   apiKey: string;
   setApiKey: (key: string) => void;
   hasApiKey: boolean;
+  systemPrompt: string;
+  setSystemPrompt: (prompt: string) => void;
 }
 
 const AIContext = createContext<AIContextType | null>(null);
@@ -23,24 +25,36 @@ interface AIProviderProps {
   children: ReactNode;
 }
 
+const DEFAULT_SYSTEM_PROMPT = 'Eres un asistente de compras y planificación de menús llamado Mercado Mágico. Ayudas a los usuarios a gestionar su lista de compras y a planificar sus menús semanales. Debes ser amable, servicial y dar respuestas concisas en español. Estructura tus respuestas en párrafos claros y ordenados, usando listas numeradas o con viñetas cuando sea apropiado.';
+
 export const AIProvider = ({ children }: AIProviderProps) => {
   const [apiKey, setApiKey] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
+  const [systemPrompt, setSystemPrompt] = useState<string>(DEFAULT_SYSTEM_PROMPT);
   
-  // Intenta cargar la API key del localStorage al inicio
+  // Intenta cargar la API key y system prompt del localStorage al inicio
   useEffect(() => {
     const savedApiKey = localStorage.getItem('groq_api_key');
     if (savedApiKey) {
       setApiKey(savedApiKey);
     }
+    
+    const savedSystemPrompt = localStorage.getItem('system_prompt');
+    if (savedSystemPrompt) {
+      setSystemPrompt(savedSystemPrompt);
+    }
   }, []);
 
-  // Guarda la API key en localStorage cuando cambia
+  // Guarda la API key y system prompt en localStorage cuando cambian
   useEffect(() => {
     if (apiKey) {
       localStorage.setItem('groq_api_key', apiKey);
     }
   }, [apiKey]);
+  
+  useEffect(() => {
+    localStorage.setItem('system_prompt', systemPrompt);
+  }, [systemPrompt]);
 
   const generateResponse = async (message: string): Promise<string> => {
     if (!apiKey) {
@@ -61,7 +75,7 @@ export const AIProvider = ({ children }: AIProviderProps) => {
           messages: [
             {
               role: 'system',
-              content: 'Eres un asistente de compras y planificación de menús llamado Mercado Mágico. Ayudas a los usuarios a gestionar su lista de compras y a planificar sus menús semanales. Debes ser amable, servicial y dar respuestas concisas en español.'
+              content: systemPrompt
             },
             {
               role: 'user',
@@ -95,7 +109,9 @@ export const AIProvider = ({ children }: AIProviderProps) => {
         isLoading, 
         apiKey, 
         setApiKey, 
-        hasApiKey: Boolean(apiKey) 
+        hasApiKey: Boolean(apiKey),
+        systemPrompt,
+        setSystemPrompt
       }}
     >
       {children}

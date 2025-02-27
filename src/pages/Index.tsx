@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
-import { Plus, X, Check, ChevronDown, ChevronUp, Send, ShoppingCart, Calendar, Loader2 } from "lucide-react";
+import { Plus, X, Check, ChevronDown, ChevronUp, Send, ShoppingCart, Calendar, Loader2, Settings } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -17,6 +17,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAI } from "@/components/AIProvider";
 import { APIKeyForm } from "@/components/APIKeyForm";
+import { SystemPromptForm } from "@/components/SystemPromptForm";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface MenuItem {
   id: string;
@@ -77,6 +79,7 @@ const Index = () => {
   const [showMenuInput, setShowMenuInput] = useState(false);
   const [showShoppingList, setShowShoppingList] = useState(false);
   const [showMenuList, setShowMenuList] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Auto scroll al último mensaje
   useEffect(() => {
@@ -100,7 +103,7 @@ const Index = () => {
     
     // Si no tiene la clave API, no intentamos procesar el mensaje
     if (!hasApiKey && !action) {
-      addAssistantMessage("Para poder responder a tus preguntas, necesito que introduzcas tu API Key de Perplexity.");
+      addAssistantMessage("Para poder responder a tus preguntas, necesito que introduzcas tu API Key de Groq.");
       return;
     }
     
@@ -420,6 +423,38 @@ const Index = () => {
     }
   };
 
+  // Formatear el contenido del mensaje
+  const formatMessageContent = (content: string) => {
+    // Divide el contenido en párrafos
+    const paragraphs = content.split('\n\n');
+    
+    return paragraphs.map((paragraph, index) => {
+      // Detecta si el párrafo es una lista
+      if (paragraph.includes('- ')) {
+        const listItems = paragraph.split('- ').filter(item => item.trim());
+        return (
+          <ul key={index} className="list-disc pl-5 space-y-1 my-2">
+            {listItems.map((item, i) => (
+              <li key={i} className="text-sm">{item.trim()}</li>
+            ))}
+          </ul>
+        );
+      } else if (/^\d+\./.test(paragraph)) {
+        // Lista numerada
+        const listItems = paragraph.split(/\d+\.\s/).filter(item => item.trim());
+        return (
+          <ol key={index} className="list-decimal pl-5 space-y-1 my-2">
+            {listItems.map((item, i) => (
+              <li key={i} className="text-sm">{item.trim()}</li>
+            ))}
+          </ol>
+        );
+      } else {
+        return <p key={index} className="my-1">{paragraph}</p>;
+      }
+    });
+  };
+
   // Si no hay API key, mostramos el formulario para ingresarla
   if (!hasApiKey) {
     return (
@@ -438,7 +473,7 @@ const Index = () => {
           </p>
           
           <p className="text-sm text-neutral-600 max-w-md mx-auto mb-8">
-            Para poder utilizar Llama 3 en el asistente, necesitas proporcionar una API Key de Perplexity.
+            Para poder utilizar Llama 3 en el asistente, necesitas proporcionar una API Key de Groq.
             Esta clave se guardará localmente en tu navegador.
           </p>
           
@@ -465,299 +500,345 @@ const Index = () => {
           </p>
         </motion.div>
 
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-neutral-200">
-          <div className="h-[500px] md:h-[600px] flex flex-col">
-            <ScrollArea className="flex-grow p-4">
-              <div className="space-y-4">
-                <AnimatePresence>
-                  {messages.map((message) => (
-                    <motion.div
-                      key={message.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}
-                    >
-                      <div 
-                        className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                          message.type === "user" 
-                            ? "bg-indigo-500 text-white" 
-                            : "bg-neutral-100 text-neutral-800"
-                        }`}
+        {showSettings ? (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Card className="mb-6">
+              <CardContent className="pt-6">
+                <Tabs defaultValue="api-key">
+                  <TabsList className="mb-4">
+                    <TabsTrigger value="api-key">API Key</TabsTrigger>
+                    <TabsTrigger value="system-prompt">Prompt del Sistema</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="api-key">
+                    <APIKeyForm />
+                  </TabsContent>
+                  <TabsContent value="system-prompt">
+                    <SystemPromptForm />
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+            <div className="flex justify-center mb-6">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowSettings(false)}
+              >
+                Volver al chat
+              </Button>
+            </div>
+          </motion.div>
+        ) : (
+          <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-neutral-200">
+            <div className="h-[500px] md:h-[600px] flex flex-col">
+              <ScrollArea className="flex-grow p-4">
+                <div className="space-y-4">
+                  <AnimatePresence>
+                    {messages.map((message) => (
+                      <motion.div
+                        key={message.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}
                       >
-                        {message.content}
+                        <div 
+                          className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                            message.type === "user" 
+                              ? "bg-indigo-500 text-white" 
+                              : "bg-neutral-100 text-neutral-800"
+                          }`}
+                        >
+                          {message.type === "assistant" 
+                            ? formatMessageContent(message.content) 
+                            : message.content}
 
-                        {/* Mostrar lista de compras si está activada */}
-                        {message.action === "showShoppingList" && showShoppingList && shoppingItems.length > 0 && (
-                          <Card className="mt-3 bg-white overflow-hidden">
-                            <CardContent className="p-3">
-                              <div className="text-sm font-medium mb-2 text-neutral-700">Tu lista de compras:</div>
-                              <div className="space-y-2 max-h-48 overflow-y-auto">
-                                {shoppingItems.map((item) => (
-                                  <div 
-                                    key={item.id}
-                                    className={`flex items-center justify-between p-2 rounded-lg border ${
-                                      item.checked 
-                                        ? "bg-neutral-50 border-neutral-100" 
-                                        : "bg-white border-neutral-200"
-                                    }`}
-                                  >
-                                    <div className="flex items-center space-x-2 flex-1">
-                                      <Button
-                                        variant="outline"
-                                        size="icon"
-                                        className={`h-5 w-5 rounded-full ${
-                                          item.checked 
-                                            ? "bg-emerald-100 text-emerald-600 border-emerald-200" 
-                                            : "bg-white text-neutral-300 border-neutral-200"
-                                        }`}
-                                        onClick={() => {
-                                          sendMessage(`Marca ${item.name} como ${item.checked ? "pendiente" : "comprado"}`, "toggleItem", { id: item.id });
-                                        }}
-                                      >
-                                        {item.checked && <Check className="h-3 w-3" />}
-                                      </Button>
-                                      <span className={`text-xs ${item.checked ? "line-through text-neutral-400" : "text-neutral-700"}`}>
-                                        {item.name}
-                                      </span>
+                          {/* Mostrar lista de compras si está activada */}
+                          {message.action === "showShoppingList" && showShoppingList && shoppingItems.length > 0 && (
+                            <Card className="mt-3 bg-white overflow-hidden">
+                              <CardContent className="p-3">
+                                <div className="text-sm font-medium mb-2 text-neutral-700">Tu lista de compras:</div>
+                                <div className="space-y-2 max-h-48 overflow-y-auto">
+                                  {shoppingItems.map((item) => (
+                                    <div 
+                                      key={item.id}
+                                      className={`flex items-center justify-between p-2 rounded-lg border ${
+                                        item.checked 
+                                          ? "bg-neutral-50 border-neutral-100" 
+                                          : "bg-white border-neutral-200"
+                                      }`}
+                                    >
+                                      <div className="flex items-center space-x-2 flex-1">
+                                        <Button
+                                          variant="outline"
+                                          size="icon"
+                                          className={`h-5 w-5 rounded-full ${
+                                            item.checked 
+                                              ? "bg-emerald-100 text-emerald-600 border-emerald-200" 
+                                              : "bg-white text-neutral-300 border-neutral-200"
+                                          }`}
+                                          onClick={() => {
+                                            sendMessage(`Marca ${item.name} como ${item.checked ? "pendiente" : "comprado"}`, "toggleItem", { id: item.id });
+                                          }}
+                                        >
+                                          {item.checked && <Check className="h-3 w-3" />}
+                                        </Button>
+                                        <span className={`text-xs ${item.checked ? "line-through text-neutral-400" : "text-neutral-700"}`}>
+                                          {item.name}
+                                        </span>
+                                      </div>
+                                      <Badge className={`${getCategoryColor(item.category)} text-[10px] font-normal`}>
+                                        {item.category}
+                                      </Badge>
                                     </div>
-                                    <Badge className={`${getCategoryColor(item.category)} text-[10px] font-normal`}>
-                                      {item.category}
-                                    </Badge>
-                                  </div>
-                                ))}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        )}
+                                  ))}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          )}
 
-                        {/* Mostrar menús si está activado */}
-                        {message.action === "showMenus" && showMenuList && menuItems.length > 0 && (
-                          <Card className="mt-3 bg-white overflow-hidden">
-                            <CardContent className="p-3">
-                              <div className="text-sm font-medium mb-2 text-neutral-700">Tus menús semanales:</div>
-                              <div className="space-y-2 max-h-48 overflow-y-auto">
-                                {menuItems.map((menu) => (
-                                  <div 
-                                    key={menu.id}
-                                    className="border border-neutral-200 rounded-lg overflow-hidden bg-white"
-                                  >
-                                    <div className="flex items-center justify-between p-2">
-                                      <div className="flex items-center space-x-2">
-                                        <Badge className={`${getMenuTypeColor(menu.type)} text-[10px] font-normal`}>
-                                          {menu.type}
-                                        </Badge>
-                                        <span className="text-xs font-medium text-neutral-700">{menu.name}</span>
+                          {/* Mostrar menús si está activado */}
+                          {message.action === "showMenus" && showMenuList && menuItems.length > 0 && (
+                            <Card className="mt-3 bg-white overflow-hidden">
+                              <CardContent className="p-3">
+                                <div className="text-sm font-medium mb-2 text-neutral-700">Tus menús semanales:</div>
+                                <div className="space-y-2 max-h-48 overflow-y-auto">
+                                  {menuItems.map((menu) => (
+                                    <div 
+                                      key={menu.id}
+                                      className="border border-neutral-200 rounded-lg overflow-hidden bg-white"
+                                    >
+                                      <div className="flex items-center justify-between p-2">
+                                        <div className="flex items-center space-x-2">
+                                          <Badge className={`${getMenuTypeColor(menu.type)} text-[10px] font-normal`}>
+                                            {menu.type}
+                                          </Badge>
+                                          <span className="text-xs font-medium text-neutral-700">{menu.name}</span>
+                                        </div>
+                                        <div className="flex items-center space-x-1">
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 rounded-full text-neutral-400 hover:text-neutral-600"
+                                            onClick={() => addMenuIngredientsToShoppingList(menu)}
+                                            title="Añadir ingredientes a la lista de compras"
+                                          >
+                                            <Plus className="h-3 w-3" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 rounded-full text-neutral-400 hover:text-neutral-600"
+                                            onClick={() => toggleMenuExpanded(menu.id)}
+                                          >
+                                            {expandedMenuId === menu.id ? (
+                                              <ChevronUp className="h-3 w-3" />
+                                            ) : (
+                                              <ChevronDown className="h-3 w-3" />
+                                            )}
+                                          </Button>
+                                        </div>
                                       </div>
-                                      <div className="flex items-center space-x-1">
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-6 w-6 rounded-full text-neutral-400 hover:text-neutral-600"
-                                          onClick={() => addMenuIngredientsToShoppingList(menu)}
-                                          title="Añadir ingredientes a la lista de compras"
-                                        >
-                                          <Plus className="h-3 w-3" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-6 w-6 rounded-full text-neutral-400 hover:text-neutral-600"
-                                          onClick={() => toggleMenuExpanded(menu.id)}
-                                        >
-                                          {expandedMenuId === menu.id ? (
-                                            <ChevronUp className="h-3 w-3" />
-                                          ) : (
-                                            <ChevronDown className="h-3 w-3" />
-                                          )}
-                                        </Button>
-                                      </div>
-                                    </div>
-                                    
-                                    <AnimatePresence>
-                                      {expandedMenuId === menu.id && (
-                                        <motion.div
-                                          initial={{ height: 0, opacity: 0 }}
-                                          animate={{ height: "auto", opacity: 1 }}
-                                          exit={{ height: 0, opacity: 0 }}
-                                          transition={{ duration: 0.2 }}
-                                          className="px-2 pb-2 overflow-hidden"
-                                        >
-                                          <div className="pt-1 border-t border-neutral-100">
-                                            <p className="text-[10px] text-neutral-500 mb-1">Ingredientes:</p>
-                                            <div className="flex flex-wrap gap-1">
-                                              {menu.ingredients.map((ingredient, index) => (
-                                                <Badge 
-                                                  key={index} 
-                                                  className="bg-neutral-100 text-neutral-700 border-neutral-200 text-[10px]"
-                                                >
-                                                  {ingredient}
-                                                </Badge>
-                                              ))}
+                                      
+                                      <AnimatePresence>
+                                        {expandedMenuId === menu.id && (
+                                          <motion.div
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: "auto", opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            transition={{ duration: 0.2 }}
+                                            className="px-2 pb-2 overflow-hidden"
+                                          >
+                                            <div className="pt-1 border-t border-neutral-100">
+                                              <p className="text-[10px] text-neutral-500 mb-1">Ingredientes:</p>
+                                              <div className="flex flex-wrap gap-1">
+                                                {menu.ingredients.map((ingredient, index) => (
+                                                  <Badge 
+                                                    key={index} 
+                                                    className="bg-neutral-100 text-neutral-700 border-neutral-200 text-[10px]"
+                                                  >
+                                                    {ingredient}
+                                                  </Badge>
+                                                ))}
+                                              </div>
                                             </div>
-                                          </div>
-                                        </motion.div>
-                                      )}
-                                    </AnimatePresence>
-                                  </div>
-                                ))}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        )}
+                                          </motion.div>
+                                        )}
+                                      </AnimatePresence>
+                                    </div>
+                                  ))}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          )}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                  {isLoading && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="flex justify-start"
+                    >
+                      <div className="flex items-center space-x-2 p-3 rounded-2xl bg-neutral-100 text-neutral-500">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-sm">Pensando...</span>
                       </div>
                     </motion.div>
-                  ))}
-                </AnimatePresence>
-                {isLoading && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="flex justify-start"
-                  >
-                    <div className="flex items-center space-x-2 p-3 rounded-2xl bg-neutral-100 text-neutral-500">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-sm">Pensando...</span>
-                    </div>
-                  </motion.div>
-                )}
-                <div ref={messageEndRef} />
-              </div>
-            </ScrollArea>
+                  )}
+                  <div ref={messageEndRef} />
+                </div>
+              </ScrollArea>
 
-            <div className="p-4 border-t border-neutral-200 bg-white">
-              <form onSubmit={handleSubmit} className="flex items-end gap-2">
-                <div className="flex-1 space-y-2">
-                  {showShoppingInput ? (
-                    <div className="flex flex-col space-y-2">
-                      <div className="text-xs text-neutral-500">Añadiendo producto a la lista</div>
-                      <div className="flex gap-2">
+              <div className="p-4 border-t border-neutral-200 bg-white">
+                <form onSubmit={handleSubmit} className="flex items-end gap-2">
+                  <div className="flex-1 space-y-2">
+                    {showShoppingInput ? (
+                      <div className="flex flex-col space-y-2">
+                        <div className="text-xs text-neutral-500">Añadiendo producto a la lista</div>
+                        <div className="flex gap-2">
+                          <Input
+                            ref={inputRef}
+                            type="text"
+                            placeholder="Nombre del producto..."
+                            value={newItemName}
+                            onChange={(e) => setNewItemName(e.target.value)}
+                            className="border-neutral-200 text-sm"
+                          />
+                          <Select
+                            value={newItemCategory}
+                            onValueChange={(value) => setNewItemCategory(value as ShoppingItem["category"])}
+                          >
+                            <SelectTrigger className="w-32 md:w-40 border-neutral-200 text-sm">
+                              <SelectValue placeholder="Categoría" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="frutas">Frutas</SelectItem>
+                              <SelectItem value="verduras">Verduras</SelectItem>
+                              <SelectItem value="carnes">Carnes</SelectItem>
+                              <SelectItem value="lácteos">Lácteos</SelectItem>
+                              <SelectItem value="otros">Otros</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    ) : showMenuInput ? (
+                      <div className="flex flex-col space-y-2">
+                        <div className="text-xs text-neutral-500">Creando un nuevo menú</div>
                         <Input
                           ref={inputRef}
                           type="text"
-                          placeholder="Nombre del producto..."
-                          value={newItemName}
-                          onChange={(e) => setNewItemName(e.target.value)}
+                          placeholder="¿Qué quieres hacer?"
+                          value={inputValue}
+                          onChange={(e) => setInputValue(e.target.value)}
                           className="border-neutral-200 text-sm"
                         />
-                        <Select
-                          value={newItemCategory}
-                          onValueChange={(value) => setNewItemCategory(value as ShoppingItem["category"])}
-                        >
-                          <SelectTrigger className="w-32 md:w-40 border-neutral-200 text-sm">
-                            <SelectValue placeholder="Categoría" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="frutas">Frutas</SelectItem>
-                            <SelectItem value="verduras">Verduras</SelectItem>
-                            <SelectItem value="carnes">Carnes</SelectItem>
-                            <SelectItem value="lácteos">Lácteos</SelectItem>
-                            <SelectItem value="otros">Otros</SelectItem>
-                          </SelectContent>
-                        </Select>
                       </div>
-                    </div>
-                  ) : showMenuInput ? (
-                    <div className="flex flex-col space-y-2">
-                      <div className="text-xs text-neutral-500">Creando un nuevo menú</div>
+                    ) : (
                       <Input
                         ref={inputRef}
                         type="text"
-                        placeholder="¿Qué quieres hacer?"
+                        placeholder="Escribe un mensaje..."
                         value={inputValue}
                         onChange={(e) => setInputValue(e.target.value)}
                         className="border-neutral-200 text-sm"
+                        disabled={isLoading}
                       />
-                    </div>
-                  ) : (
-                    <Input
-                      ref={inputRef}
-                      type="text"
-                      placeholder="Escribe un mensaje..."
-                      value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
-                      className="border-neutral-200 text-sm"
+                    )}
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button 
+                      type="button" 
+                      size="icon" 
+                      variant="outline"
+                      onClick={() => {
+                        setShowShoppingList(prev => !prev);
+                        setShowMenuList(false);
+                        if (!showShoppingList) {
+                          sendMessage("Ver mi lista de compras", "showShoppingList");
+                        }
+                      }}
+                      className={`rounded-full ${showShoppingList ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : ''}`}
+                    >
+                      <ShoppingCart className="h-4 w-4" />
+                    </Button>
+                    
+                    <Button 
+                      type="button" 
+                      size="icon" 
+                      variant="outline"
+                      onClick={() => {
+                        setShowMenuList(prev => !prev);
+                        setShowShoppingList(false);
+                        if (!showMenuList) {
+                          sendMessage("Ver mis menús", "showMenus");
+                        }
+                      }}
+                      className={`rounded-full ${showMenuList ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : ''}`}
+                    >
+                      <Calendar className="h-4 w-4" />
+                    </Button>
+                    
+                    <Button 
+                      type="button" 
+                      size="icon" 
+                      variant="outline"
+                      onClick={() => setShowSettings(true)}
+                      className="rounded-full"
+                      title="Configuración"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                    
+                    <Button 
+                      type="submit" 
+                      size="icon" 
+                      className="rounded-full bg-indigo-500 hover:bg-indigo-600"
                       disabled={isLoading}
-                    />
-                  )}
-                </div>
+                    >
+                      {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </form>
                 
-                <div className="flex gap-2">
-                  <Button 
-                    type="button" 
-                    size="icon" 
-                    variant="outline"
-                    onClick={() => {
-                      setShowShoppingList(prev => !prev);
-                      setShowMenuList(false);
-                      if (!showShoppingList) {
-                        sendMessage("Ver mi lista de compras", "showShoppingList");
-                      }
-                    }}
-                    className={`rounded-full ${showShoppingList ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : ''}`}
-                  >
-                    <ShoppingCart className="h-4 w-4" />
-                  </Button>
-                  
-                  <Button 
-                    type="button" 
-                    size="icon" 
-                    variant="outline"
-                    onClick={() => {
-                      setShowMenuList(prev => !prev);
-                      setShowShoppingList(false);
-                      if (!showMenuList) {
-                        sendMessage("Ver mis menús", "showMenus");
-                      }
-                    }}
-                    className={`rounded-full ${showMenuList ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : ''}`}
-                  >
-                    <Calendar className="h-4 w-4" />
-                  </Button>
-                  
-                  <Button 
-                    type="submit" 
-                    size="icon" 
-                    className="rounded-full bg-indigo-500 hover:bg-indigo-600"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </form>
-              
-              <div className="mt-3 flex justify-center">
-                <div className="flex gap-1 text-xs text-neutral-400">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto py-1 px-2 text-xs"
-                    onClick={() => {
-                      sendMessage("Añadir producto", "addItem");
-                      setShowShoppingInput(true);
-                    }}
-                  >
-                    Añadir producto
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto py-1 px-2 text-xs"
-                    onClick={() => {
-                      sendMessage("Añadir menú", "addMenu");
-                      setShowMenuInput(true);
-                    }}
-                  >
-                    Añadir menú
-                  </Button>
+                <div className="mt-3 flex justify-center">
+                  <div className="flex gap-1 text-xs text-neutral-400">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto py-1 px-2 text-xs"
+                      onClick={() => {
+                        sendMessage("Añadir producto", "addItem");
+                        setShowShoppingInput(true);
+                      }}
+                    >
+                      Añadir producto
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto py-1 px-2 text-xs"
+                      onClick={() => {
+                        sendMessage("Añadir menú", "addMenu");
+                        setShowMenuInput(true);
+                      }}
+                    >
+                      Añadir menú
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
