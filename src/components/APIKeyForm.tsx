@@ -34,18 +34,18 @@ export const APIKeyForm = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Key className="h-5 w-5" />
-          API Key de Perplexity
+          API Key de Groq
         </CardTitle>
         <CardDescription>
-          Para conectar con Llama 3, necesitas una API Key de Perplexity.
+          Para conectar con Llama 3, necesitas una API Key de Groq.
           Puedes obtener una en{" "}
           <a 
-            href="https://www.perplexity.ai/settings/api" 
+            href="https://console.groq.com/keys" 
             target="_blank" 
             rel="noopener noreferrer"
             className="text-indigo-600 hover:underline"
           >
-            perplexity.ai
+            console.groq.com
           </a>
         </CardDescription>
       </CardHeader>
@@ -55,7 +55,7 @@ export const APIKeyForm = () => {
             type="password"
             value={inputKey}
             onChange={(e) => setInputKey(e.target.value)}
-            placeholder="Ingresa tu API Key de Perplexity"
+            placeholder="Ingresa tu API Key de Groq"
             className="w-full"
           />
         </CardContent>

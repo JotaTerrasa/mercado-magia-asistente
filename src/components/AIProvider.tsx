@@ -29,7 +29,7 @@ export const AIProvider = ({ children }: AIProviderProps) => {
   
   // Intenta cargar la API key del localStorage al inicio
   useEffect(() => {
-    const savedApiKey = localStorage.getItem('perplexity_api_key');
+    const savedApiKey = localStorage.getItem('groq_api_key');
     if (savedApiKey) {
       setApiKey(savedApiKey);
     }
@@ -38,26 +38,26 @@ export const AIProvider = ({ children }: AIProviderProps) => {
   // Guarda la API key en localStorage cuando cambia
   useEffect(() => {
     if (apiKey) {
-      localStorage.setItem('perplexity_api_key', apiKey);
+      localStorage.setItem('groq_api_key', apiKey);
     }
   }, [apiKey]);
 
   const generateResponse = async (message: string): Promise<string> => {
     if (!apiKey) {
-      return "Por favor, introduce tu API key de Perplexity para continuar.";
+      return "Por favor, introduce tu API key de Groq para continuar.";
     }
 
     setIsLoading(true);
 
     try {
-      const response = await fetch('https://api.perplexity.ai/chat/completions', {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'llama-3.1-sonar-small-128k-online',
+          model: 'llama3-8b-8192',
           messages: [
             {
               role: 'system',
@@ -69,12 +69,7 @@ export const AIProvider = ({ children }: AIProviderProps) => {
             }
           ],
           temperature: 0.2,
-          top_p: 0.9,
-          max_tokens: 1000,
-          return_images: false,
-          return_related_questions: false,
-          frequency_penalty: 0.5,
-          presence_penalty: 0.5
+          max_tokens: 1000
         }),
       });
 
