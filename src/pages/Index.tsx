@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
-import { Plus, X, Check, ChevronDown, ChevronUp, Send, ShoppingCart, Calendar } from "lucide-react";
+import { Plus, X, Check, ChevronDown, ChevronUp, Send, ShoppingCart, Calendar, Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -15,6 +15,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
+import { useAI } from "@/components/AIProvider";
+import { APIKeyForm } from "@/components/APIKeyForm";
 
 interface MenuItem {
   id: string;
@@ -42,6 +44,7 @@ const Index = () => {
   const { toast } = useToast();
   const messageEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { generateResponse, isLoading, hasApiKey } = useAI();
   
   // Estado para la lista de compras
   const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>([]);
@@ -81,7 +84,7 @@ const Index = () => {
   }, [messages]);
 
   // Función para enviar un mensaje
-  const sendMessage = (text: string, action: Message["action"] = null, data: any = null) => {
+  const sendMessage = async (text: string, action: Message["action"] = null, data: any = null) => {
     if (text.trim() === "") return;
     
     const newMessage: Message = {
@@ -95,10 +98,51 @@ const Index = () => {
     setMessages(prev => [...prev, newMessage]);
     setInputValue("");
     
-    // Procesar mensaje del usuario
-    setTimeout(() => {
-      processUserMessage(newMessage);
-    }, 500);
+    // Si no tiene la clave API, no intentamos procesar el mensaje
+    if (!hasApiKey && !action) {
+      addAssistantMessage("Para poder responder a tus preguntas, necesito que introduzcas tu API Key de Perplexity.");
+      return;
+    }
+    
+    if (action) {
+      // Si hay una acción específica, la procesamos localmente
+      setTimeout(() => {
+        handleAction(action, data);
+      }, 500);
+    } else {
+      // Si no hay acción, enviamos el mensaje al modelo de IA
+      try {
+        const aiResponse = await generateResponse(text);
+        
+        // Intentamos detectar acciones en la respuesta de la IA
+        const lowerResponse = aiResponse.toLowerCase();
+        let detectedAction: Message["action"] = null;
+        let actionData = null;
+        
+        if (lowerResponse.includes("lista de compras") && (lowerResponse.includes("mostrar") || lowerResponse.includes("ver"))) {
+          detectedAction = "showShoppingList";
+        } else if (lowerResponse.includes("menú") && (lowerResponse.includes("mostrar") || lowerResponse.includes("ver"))) {
+          detectedAction = "showMenus";
+        } else if (lowerResponse.includes("añadir") && lowerResponse.includes("producto")) {
+          detectedAction = "addItem";
+          setShowShoppingInput(true);
+          setTimeout(() => {
+            inputRef.current?.focus();
+          }, 100);
+        } else if (lowerResponse.includes("añadir") && lowerResponse.includes("menú")) {
+          detectedAction = "addMenu";
+          setShowMenuInput(true);
+          setTimeout(() => {
+            inputRef.current?.focus();
+          }, 100);
+        }
+        
+        addAssistantMessage(aiResponse, detectedAction, actionData);
+      } catch (error) {
+        console.error("Error al obtener respuesta de IA:", error);
+        addAssistantMessage("Lo siento, ha ocurrido un error al procesar tu mensaje. Por favor, intenta de nuevo más tarde.");
+      }
+    }
   };
 
   // Función para añadir un mensaje del asistente
@@ -112,49 +156,6 @@ const Index = () => {
     };
     
     setMessages(prev => [...prev, newMessage]);
-  };
-
-  // Procesar mensaje del usuario
-  const processUserMessage = (message: Message) => {
-    const lowerContent = message.content.toLowerCase();
-    
-    // Si ya hay una acción asociada al mensaje
-    if (message.action) {
-      handleAction(message.action, message.data);
-      return;
-    }
-    
-    // Detectar intención del usuario
-    if (lowerContent.includes("añadir") && (lowerContent.includes("producto") || lowerContent.includes("item") || lowerContent.includes("artículo") || lowerContent.includes("compra"))) {
-      addAssistantMessage("¿Qué producto quieres añadir a tu lista de compras?", "addItem");
-      setShowShoppingInput(true);
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 100);
-      return;
-    }
-    
-    if (lowerContent.includes("ver") && lowerContent.includes("lista")) {
-      handleAction("showShoppingList");
-      return;
-    }
-    
-    if (lowerContent.includes("añadir") && lowerContent.includes("menú")) {
-      addAssistantMessage("Vamos a crear un nuevo menú. ¿Cómo quieres llamarlo?", "addMenu");
-      setShowMenuInput(true);
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 100);
-      return;
-    }
-    
-    if (lowerContent.includes("ver") && lowerContent.includes("menú")) {
-      handleAction("showMenus");
-      return;
-    }
-    
-    // Respuesta genérica si no se detecta intención específica
-    addAssistantMessage("Puedo ayudarte a gestionar tu lista de compras y tus menús. Puedes pedirme que añada productos, que cree menús o que te muestre tu lista de compras o tus menús existentes.");
   };
 
   // Manejar acciones específicas
@@ -419,6 +420,34 @@ const Index = () => {
     }
   };
 
+  // Si no hay API key, mostramos el formulario para ingresarla
+  if (!hasApiKey) {
+    return (
+      <div className="min-h-screen bg-neutral-50 px-4 py-8 md:py-12 flex flex-col items-center">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="mb-8 text-center"
+        >
+          <h1 className="text-3xl md:text-4xl font-light tracking-tight text-neutral-800 mb-2">
+            Mercado Mágico
+          </h1>
+          <p className="text-neutral-500 text-sm md:text-base mb-8">
+            Tu asistente personal para planificar menús y listas de compras
+          </p>
+          
+          <p className="text-sm text-neutral-600 max-w-md mx-auto mb-8">
+            Para poder utilizar Llama 3 en el asistente, necesitas proporcionar una API Key de Perplexity.
+            Esta clave se guardará localmente en tu navegador.
+          </p>
+          
+          <APIKeyForm />
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-neutral-50 px-4 py-8 md:py-12">
       <div className="max-w-3xl mx-auto">
@@ -581,6 +610,18 @@ const Index = () => {
                     </motion.div>
                   ))}
                 </AnimatePresence>
+                {isLoading && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex justify-start"
+                  >
+                    <div className="flex items-center space-x-2 p-3 rounded-2xl bg-neutral-100 text-neutral-500">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm">Pensando...</span>
+                    </div>
+                  </motion.div>
+                )}
                 <div ref={messageEndRef} />
               </div>
             </ScrollArea>
@@ -637,6 +678,7 @@ const Index = () => {
                       value={inputValue}
                       onChange={(e) => setInputValue(e.target.value)}
                       className="border-neutral-200 text-sm"
+                      disabled={isLoading}
                     />
                   )}
                 </div>
@@ -674,8 +716,13 @@ const Index = () => {
                     <Calendar className="h-4 w-4" />
                   </Button>
                   
-                  <Button type="submit" size="icon" className="rounded-full bg-indigo-500 hover:bg-indigo-600">
-                    <Send className="h-4 w-4" />
+                  <Button 
+                    type="submit" 
+                    size="icon" 
+                    className="rounded-full bg-indigo-500 hover:bg-indigo-600"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   </Button>
                 </div>
               </form>
